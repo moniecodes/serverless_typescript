@@ -1,0 +1,107 @@
+version: 2.1
+
+
+parameters:
+  region:
+    type: string
+    default: "us-east-1"
+
+defaults: &defaults
+  docker:
+    - image: circleci/node:12
+
+jobs:
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+      - install-sls
+      - build-sls
+
+  test: 
+    <<: *defaults
+    steps:
+      - run: echo "Add tests here"
+
+  deploy:
+    <<: *defaults
+    parameters:
+      env:
+        type: string
+    steps:
+      - checkout
+      - install-sls
+      - deploy-sls:
+          env: << parameters.env >>
+ 
+workflows:
+  version: 2
+  build_test_publish:
+    jobs:
+      - build
+      - test:
+          requires:
+            - build
+      - deploy:
+          env: "dev"
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - test
+      - deploy:
+          env: "stage"
+          filters:
+            branches:
+              only:
+                - staging
+          requires:
+            - test
+      - deploy:
+          env: "prod"
+          filters:
+            branches:
+              only:
+                - production
+          requires:
+            - test            
+
+commands:
+
+  install-sls:
+    description: |
+      Install serverless framework
+
+    steps:
+      - run:
+          name: Installing Serverless framework
+          command: sudo npm i -g serverless
+
+  build-sls:
+    description: |
+      Buiold serverless application
+
+    steps:
+      - run: npm install
+      - run:
+          name: Building Serverless template
+          command:  |
+            serverless deploy --noDeploy
+
+  deploy-sls:
+    description: |
+      Deploy the serverless monitoring application
+
+    parameters:
+      env:
+        description: The environment variable
+        type: string
+
+    steps:
+      - run: npm install
+      - run:
+          name: Deploying Serverless stack
+          command: |
+            echo "Deploying for $ENV"
+            serverless deploy --stage << parameters.env >>
